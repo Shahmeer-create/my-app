@@ -68,5 +68,5 @@ npm run dev             # runs on http://localhost:5173
 - `FRONTEND_URL` — Amplify URL (for CORS)
 
 ### Frontend (injected by Amplify at build time)
-- `VITE_API_URL` — Backend ALB URL
+- `VITE_API_URL` — Baceekend ALB URL
 ```
