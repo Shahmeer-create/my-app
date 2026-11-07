@@ -62,6 +62,16 @@ jobs:
           container-name: ${{env.CONTAINER_NAME}}
           image: ${{steps.build-image.outputs.image}}
 
+      - name: Run DB Migrations
+        run: |
+          aws ecs run-task \
+            --cluster ${{env.ECS_CLUSTER}} \
+            --task-definition ${{env.CONTAINER_NAME}} \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[subnet-04b3b8751972b8d32,subnet-093dd62d75fee500e,subnet-04dde824e4a9bf9db],securityGroups=[sg-05748782c7932b844],assignPublicIp=DISABLED}" \
+            --overrides '{"containerOverrides":[{"name":"${{env.CONTAINER_NAME}}","command":["node","migrate.js"]}]}' \
+            --query 'tasks[0].taskArn' --output text
+
       - name: Deploy to ECS
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
