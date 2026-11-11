@@ -1,0 +1,43 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      # Login to ECR
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+
+  build:
+    commands:
+      # Build Docker image
+      - echo Building Docker image...
+      - docker build -t $ECR_REPO_URI:$IMAGE_TAG -t $ECR_REPO_URI:latest ./backend
+
+  post_build:
+    commands:
+      # Push image to ECR
+      - echo Pushing Docker image to ECR...
+      - docker push $ECR_REPO_URI:$IMAGE_TAG
+      - docker push $ECR_REPO_URI:latest
+
+      # Run DB migrations
+      - echo Running database migrations...
+      - |
+        SUBNET=$(aws ecs describe-services --cluster $ECS_CLUSTER --services $ECS_SERVICE --query 'services[0].networkConfiguration.awsvpcConfiguration.subnets[0]' --output text)
+        SG=$(aws ecs describe-services --cluster $ECS_CLUSTER --services $ECS_SERVICE --query 'services[0].networkConfiguration.awsvpcConfiguration.securityGroups[0]' --output text)
+        aws ecs run-task \
+          --cluster $ECS_CLUSTER \
+          --task-definition $CONTAINER_NAME \
+          --launch-type FARGATE \
+          --network-configuration "awsvpcConfiguration={subnets=[$SUBNET],securityGroups=[$SG],assignPublicIp=DISABLED}" \
+          --overrides "{\"containerOverrides\":[{\"name\":\"$CONTAINER_NAME\",\"command\":[\"node\",\"migrate.js\"]}]}"
+
+      # Generate imagedefinitions.json for CodePipeline ECS deploy
+      - echo Writing imagedefinitions.json...
+      - printf '[{"name":"%s","imageUri":"%s"}]' "$CONTAINER_NAME" "$ECR_REPO_URI:$IMAGE_TAG" > imagedefinitions.json
+      - cat imagedefinitions.json
+
+artifacts:
+  files:
+    - imagedefinitions.json
