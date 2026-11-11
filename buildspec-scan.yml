@@ -1,0 +1,22 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+    commands:
+      - echo Installing scan dependencies...
+      - cd backend
+      - npm install --include=dev
+
+  build:
+    commands:
+      - echo Running ESLint syntax scan...
+      - npx eslint . --ext .js --max-warnings=0
+
+      - echo Running npm audit security scan...
+      - npm audit --audit-level=high
+
+  post_build:
+    commands:
+      - echo Scan completed successfully.
