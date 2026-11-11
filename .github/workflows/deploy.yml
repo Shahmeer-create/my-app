@@ -64,11 +64,13 @@ jobs:
 
       - name: Run DB Migrations
         run: |
+          SUBNET=$(aws ecs describe-services --cluster ${{env.ECS_CLUSTER}} --services ${{env.ECS_SERVICE}} --query 'services[0].networkConfiguration.awsvpcConfiguration.subnets[0]' --output text)
+          SG=$(aws ecs describe-services --cluster ${{env.ECS_CLUSTER}} --services ${{env.ECS_SERVICE}} --query 'services[0].networkConfiguration.awsvpcConfiguration.securityGroups[0]' --output text)
           aws ecs run-task \
             --cluster ${{env.ECS_CLUSTER}} \
             --task-definition ${{env.CONTAINER_NAME}} \
             --launch-type FARGATE \
-            --network-configuration "awsvpcConfiguration={subnets=[subnet-04b3b8751972b8d32,subnet-093dd62d75fee500e,subnet-04dde824e4a9bf9db],securityGroups=[sg-05748782c7932b844],assignPublicIp=DISABLED}" \
+            --network-configuration "awsvpcConfiguration={subnets=[$SUBNET],securityGroups=[$SG],assignPublicIp=DISABLED}" \
             --overrides '{"containerOverrides":[{"name":"${{env.CONTAINER_NAME}}","command":["node","migrate.js"]}]}' \
             --query 'tasks[0].taskArn' --output text
 
